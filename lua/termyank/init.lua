@@ -84,6 +84,20 @@ local function is_nonwhite(c)
   return c ~= nil and c:match("%S") ~= nil
 end
 
+local function line_wraps(line)
+  if not line then
+    return false
+  end
+  local win = vim.api.nvim_get_current_win()
+  local info = vim.fn.getwininfo(win)[1]
+  local textoff = info and info.textoff or 0
+  local width = vim.api.nvim_win_get_width(win) - textoff
+  if width <= 0 then
+    return false
+  end
+  return vim.fn.strdisplaywidth(line) >= width
+end
+
 local function find_extended_WORD(buf, lnum, col)
   if not is_nonwhite(char_at(buf, lnum, col)) then
     return nil
@@ -95,7 +109,7 @@ local function find_extended_WORD(buf, lnum, col)
       start_col = start_col - 1
     elseif start_col == 1 and start_lnum > 1 and not line_is_blank(buf, start_lnum - 1) then
       local prev = vim.api.nvim_buf_get_lines(buf, start_lnum - 2, start_lnum - 1, false)[1]
-      if prev and #prev > 0 and is_nonwhite(prev:sub(#prev, #prev)) then
+      if prev and #prev > 0 and line_wraps(prev) and is_nonwhite(prev:sub(#prev, #prev)) then
         start_lnum = start_lnum - 1
         start_col = #prev
       else
@@ -112,7 +126,7 @@ local function find_extended_WORD(buf, lnum, col)
     local cur = vim.api.nvim_buf_get_lines(buf, end_lnum - 1, end_lnum, false)[1] or ""
     if end_col < #cur and is_nonwhite(cur:sub(end_col + 1, end_col + 1)) then
       end_col = end_col + 1
-    elseif end_col == #cur and end_lnum < last_line and not line_is_blank(buf, end_lnum + 1) then
+    elseif end_col == #cur and end_lnum < last_line and line_wraps(cur) and not line_is_blank(buf, end_lnum + 1) then
       local nxt = vim.api.nvim_buf_get_lines(buf, end_lnum, end_lnum + 1, false)[1] or ""
       if #nxt > 0 and is_nonwhite(nxt:sub(1, 1)) then
         end_lnum = end_lnum + 1
@@ -172,7 +186,7 @@ local function step_forward(buf, lnum, col)
     return lnum, col + 1
   end
   local last_line = vim.api.nvim_buf_line_count(buf)
-  if lnum >= last_line or line_is_blank(buf, lnum + 1) then
+  if lnum >= last_line or line_is_blank(buf, lnum + 1) or not line_wraps(line) then
     return nil
   end
   return lnum + 1, 1
@@ -186,7 +200,7 @@ local function step_backward(buf, lnum, col)
     return nil
   end
   local prev = vim.api.nvim_buf_get_lines(buf, lnum - 2, lnum - 1, false)[1] or ""
-  if #prev == 0 then
+  if #prev == 0 or not line_wraps(prev) then
     return nil
   end
   return lnum - 1, #prev
