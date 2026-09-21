@@ -34,10 +34,12 @@ local function is_blockwise(regtype)
 end
 
 local function transform_for_regtype(lines, regtype)
+	local stripped, changed = strip_cr_lines(lines)
+
   if is_blockwise(regtype) then
-    return nil
+    return stripped, regtype
   end
-  local stripped, changed = strip_cr_lines(lines)
+
   if #lines == 1 and not changed then
     return nil
   end
